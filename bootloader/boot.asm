@@ -46,7 +46,7 @@ boot_drive db 0
 
 ; 32 BIT ;
 
-[bits 32]
+[bits 64]
 BEGIN_PM:
    call KERNEL_OFFSET
    jmp $

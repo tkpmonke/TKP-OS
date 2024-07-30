@@ -7,29 +7,38 @@ CFLAGS = -g
 CC = i386-elf-gcc
 GDB = gdb
 
-image.bin: boot.bin kernel.bin
-	cat $^ > image.bin
+bin/image.bin: bin/boot.bin bin/kernel.bin
+	mkdir bin
+	cat $^ > $@
 
-kernel.bin: kernel_entry.o ${OBJ}
+bin/kernel.bin: obj/kernel_entry.o ${OBJ}
 	i386-elf-ld -o $@ -Ttext 0x1000 $^ --oformat binary
 
-kernel.elf: kernel_entry.o ${OBJ}
+bin/debug/kernel.elf: obj/kernel_entry.o ${OBJ}
 	i386-elf-ld -o $@ -Ttext 0x1000 $^ 
 
-run: image.bin
-	qemu-system-i386 -fda image.bin
+run: bin/image.bin 
+	qemu-system-i386 -fda $<
 
-debug: image.bin kernel.elf
-	qemu-system-i386 -s -fda image.bin &
-	${GDB} -ex "target remote localhost:1234" -ex "symbol-file kernel.elf"
+build: bin/tkpos.iso
 
-%.o: %.c ${HEADERS}
+bin/tkpos.iso: bin/image.bin
+	mkdir iso
+	dd if=/dev/zero of=bin/floppy.img bs=1024 count=1440
+	dd if=$< of=bin/floppy.img seek=0 count=1 conv=notrunc
+	genisoimage -quiet -V 'TKP-OS' -input-charset iso8859-1 -o $@ -hide floppy.img iso/
+
+debug: bin/image.bin bin/debug/kernel.elf
+	qemu-system-i386 -s -fda bin/image.bin &
+	${GDB} -ex "target remote localhost:1234" -ex "symbol-file bin/debug/kernel.elf"
+
+obj/%.o: %.c ${HEADERS}
 	${CC} ${CFLAGS} -ffreestanding -c $< -o $@
 
-%.o: bootloader/%.asm
+obj/%.o: bootloader/%.asm
 	nasm $< -f elf -o $@
 
-%.bin: bootloader/%.asm
+bin/%.bin: bootloader/%.asm
 	nasm $< -f bin -o $@
 
 clean:
